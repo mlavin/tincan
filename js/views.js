@@ -22,26 +22,33 @@ var views = (function ($, _, Backbone) {
     }),
     LeaderView = Backbone.View.extend({
         el: '#room',
+        template: '#leader-room',
         initialize: function (options) {
             this.options = options;
             this.server = this.options.server;
-            this.server.on('new-peer', function () {
-                console.log('Peer Connected!');
-            });
+            this.server.on('new-peer', _.bind(this.onPeer, this));
+            this.template = _.template($(this.template).html());
         },
         render: function () {
+            this.$el.html(this.template());
             $('.page').removeClass('active');
             this.$el.addClass('active');
+        },
+        onPeer: function () {
+            $('#peer-status', this.$el).text('Connected').addClass('active');
         }
     }),
     PeerView = Backbone.View.extend({
         el: '#room',
+        template: '#peer-room',
         initialize: function (options) {
             this.options = options;
             this.server = this.options.server;
             this.room = this.options.room;
+            this.template = _.template($(this.template).html());
         },
         render: function () {
+            this.$el.html(this.template());
             this.server.joinRoom(this.room)
                 .then(_.bind(this.validRoom, this))
                 .fail(_.bind(this.invalidRoom, this));
