@@ -1,11 +1,9 @@
-var SignalConnection = (function ($, Backbone) {
-    function SignalConnection(server) {
-        this.ws = new WebSocket(server);
+var SignalConnection = (function ($, _, Backbone) {
+    function SignalConnection(url) {
+        this.url = url;
         this.events = _.extend({}, Backbone.Events);
         this.room = null;
         this.connected = new $.Deferred();
-        this.ws.onopen = _.bind(this.onopen, this);
-        this.ws.onmessage = _.bind(this.onmessage, this);
     }
 
     SignalConnection.prototype.on = function (event, callback, context) {
@@ -14,6 +12,16 @@ var SignalConnection = (function ($, Backbone) {
 
     SignalConnection.prototype.trigger = function (event, args) {
         this.events.trigger(event, args);
+    };
+
+    SignalConnection.prototype.connect = function () {
+        if (!this.ws) {
+            console.log(this.url);
+            this.ws = new WebSocket(this.url);
+            this.ws.onopen = _.bind(this.onopen, this);
+            this.ws.onmessage = _.bind(this.onmessage, this);
+        }
+        return this.connected
     };
 
     SignalConnection.prototype.onopen = function () {
@@ -76,16 +84,21 @@ var SignalConnection = (function ($, Backbone) {
     };
 
     SignalConnection.prototype.send = function (message) {
-        this.ws.send(message);
+        var self = this;
+        this.connect().then(function () {
+            self.ws.send(message);
+        });
     };
 
     SignalConnection.prototype.createRoom = function () {
         var self = this;
             result = new $.Deferred();
-        this.send('CREATE');
-        this.on('new-room', function (name) {
-            self.room = name;
-            result.resolve(name);
+        this.connect().then(function () {
+            self.send('CREATE');
+            self.on('new-room', function (name) {
+                self.room = name;
+                result.resolve(name);
+            });
         });
         return result;
     };
@@ -93,16 +106,18 @@ var SignalConnection = (function ($, Backbone) {
     SignalConnection.prototype.joinRoom = function (name) {
         var self = this;
             result = new $.Deferred();
-        this.send('JOIN ' + name);
-        this.on('joined-room', function (name) {
-            self.room = name;
-            result.resolve(name);
-        });
-        this.on('invalid-room', function (error) {
-            result.reject(name);
+        this.connect().then(function () {
+            self.send('JOIN ' + name);
+            self.on('joined-room', function (name) {
+                self.room = name;
+                result.resolve(name);
+            });
+            self.on('invalid-room', function (error) {
+                result.reject(name);
+            });
         });
         return result;
     };
 
     return SignalConnection;
-})(jQuery, Backbone);
+})(jQuery, _, Backbone);
