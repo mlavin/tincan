@@ -16,7 +16,6 @@ var SignalConnection = (function ($, _, Backbone) {
 
     SignalConnection.prototype.connect = function () {
         if (!this.ws) {
-            console.log(this.url);
             this.ws = new WebSocket(this.url);
             this.ws.onopen = _.bind(this.onopen, this);
             this.ws.onmessage = _.bind(this.onmessage, this);
@@ -64,6 +63,7 @@ var SignalConnection = (function ($, _, Backbone) {
     SignalConnection.prototype.onmessage = function (message) {
         var msg = message.data,
             roomMsg;
+        console.log(msg);
         if (this.room === null) {
             roomMsg = _isRoomMessage(msg);
             if (roomMsg.room) {
@@ -78,8 +78,9 @@ var SignalConnection = (function ($, _, Backbone) {
         } else {
             if (_isConnectedPeer(msg)) {
                 this.trigger('new-peer');
+            } else {
+                this.trigger('peer-msg', [msg]);
             }
-            console.log(msg);
         }
     };
 

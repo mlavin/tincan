@@ -1,32 +1,26 @@
-(function ($) {
-    var server = new SignalConnection('ws://localhost:8080/');
-
-    $('#create-room').on('click', function (e) {
-        e.preventDefault();
-        server.createRoom().then(function (room) {
-            window.location.hash = '#room/' + room;
-        });
-    });
-
+(function ($, _, Backbone, views, SignalConnection) {
     var AppRouter = Backbone.Router.extend({
+        initialize: function (options) {
+            this.options = options;
+            this.url = (this.options && this.options.url) || 'ws://localhost:8080/';
+            this.server = new SignalConnection(this.url);
+            this.homepage = new views.homepage({server: this.server});
+        },
         routes: {
+            '': 'homePage',
             'room/:room': 'enterRoom' // #room/123
         },
+        homePage: function() {
+            this.homepage.render();
+        },
         enterRoom: function (room) {
-            console.log('Entered room');
-            if (!server.room) {
-                server.connected.then(function () {
-                    server.joinRoom(room).then(function (name) {
-                        console.log('Joined ' + name);
-                    }).fail(function (error) {
-                        alert(error);
-                    });
-                });
+            var view;
+            if (!this.server.room) {
+                view = new views.peer({server: this.server, room: room});
             } else {
-                server.on('new-peer', function () {
-                    alert('Peer Connected!');
-                });
+                view = new views.leader({server: this.server});
             }
+            view.render();
         }
     });
 
@@ -34,4 +28,4 @@
         var router = new AppRouter();
         Backbone.history.start();
     });
-})(jQuery, Backbone, SignalConnection);
+})(jQuery, _, Backbone, views, SignalConnection);
