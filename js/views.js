@@ -1,4 +1,4 @@
-var views = (function ($, _, Backbone, getUserMedia, Offer) {
+var views = (function ($, _, Backbone, getUserMedia, Channel) {
     var HomePageView = Backbone.View.extend({
         el: '#homepage',
         events: {
@@ -31,32 +31,29 @@ var views = (function ($, _, Backbone, getUserMedia, Offer) {
             this.template = _.template($(this.template).html());
         },
         render: function () {
-            this.$el.html(this.template());
+            this.$el.html(this.template({room: this.server.room}));
             $('.page').removeClass('active');
             this.$el.addClass('active');
         },
         onPeer: function () {
-            $('#peer-status', this.$el).text('Connected').addClass('active');
-            getUserMedia({audio:true, video:false, fake: true},
-                _.bind(this.gotLocalStream, this), _.bind(this.reportFailure, this));
-        },
-        gotLocalStream: function (stream) {
             var self = this;
-            this.offer = new Offer(this.server.room, stream);
-            this.offer.on('local-offer', function (offerDesc) {
+            $('#peer-status', this.$el).text('Connected').addClass('active');
+            this.channel = new Channel(this.server.room);
+            this.channel.on('local-offer', function (offerDesc) {
                 self.server.send(JSON.stringify(offerDesc));
             });
-        },
-        reportFailure: function () {
-            //
+            this.channel.on('channel-connection', function (channel) {
+                console.log('Data Channel Open');
+            });
         },
         connectionOpen: function () {
             console.log('Connection open!');
         },
         onSignalMessage: function (msg) {
-            if (this.offer && !this.answer) {
+            if (this.channel && !this.answer) {
                 // Assume the first message is the answer
-                this.offer.acceptAnswer(JSON.parse(msg));
+                this.answer = JSON.parse(msg)[0];
+                this.channel.acceptAnswer(this.answer);
             }
         }
     }),
@@ -80,8 +77,10 @@ var views = (function ($, _, Backbone, getUserMedia, Offer) {
         },
         validRoom: function () {
             var self = this;
-            getUserMedia({audio:true, video:false, fake: true},
-                _.bind(this.gotLocalStream, this), _.bind(this.reportFailure, this));
+            this.channel = new Channel(this.server.room);
+            self.channel.on('local-answer', function (answerDesc) {
+                self.server.send(JSON.stringify(answerDesc));
+            });
         },
         invalidRoom: function () {
 
@@ -89,18 +88,11 @@ var views = (function ($, _, Backbone, getUserMedia, Offer) {
         reportFailure: function () {
 
         },
-        gotLocalStream: function (stream) {
-            var self = this;
-            self.offer = new Offer(this.server.room, stream);
-            self.offer.on('local-answer', function (answerDesc) {
-                console.log('answer');
-                self.server.send(JSON.stringify(answerDesc));
-            });
-        },
         onSignalMessage: function (msg) {
-            if (this.offer && !this.answer) {
+            if (this.channel && !this.answer) {
                 // Assume the first message is an offer
-                this.offer.acceptOffer(JSON.parse(msg));
+                this.answer = JSON.parse(msg)[0];
+                this.channel.acceptOffer(this.answer);
             }
         }
     });
@@ -109,4 +101,4 @@ var views = (function ($, _, Backbone, getUserMedia, Offer) {
         leader: LeaderView,
         peer: PeerView,
     }
-})(jQuery, _, Backbone, getUserMedia, Offer);
+})(jQuery, _, Backbone, getUserMedia, Channel);

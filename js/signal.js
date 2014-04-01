@@ -63,7 +63,6 @@ var SignalConnection = (function ($, _, Backbone) {
     SignalConnection.prototype.onmessage = function (message) {
         var msg = message.data,
             roomMsg;
-        console.log(msg);
         if (this.room === null) {
             roomMsg = _isRoomMessage(msg);
             if (roomMsg.room) {
