@@ -1,42 +1,33 @@
 var Channel = (function ($, _, Backbone, webrtcDetectedBrowser, getUserMedia, attachMediaStream,
     RTCPeerConnection, RTCSessionDescription, RTCIceCandidate) {
     var servers = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]},
-        connectionOptions = {optional: [{RtpDataChannels: true}]},
-        noop = function () {},
-        logerror = function (err) {
-            console.log(err);
-        };
+        connectionOptions = {optional: [{RtpDataChannels: true}]};
 
-    function Channel(name) {
+    function Channel(signal, leader) {
         var self = this;
-        this.name = name;
+        this.signal = signal;
+        this.leader = leader;
+        this.signal.on('peer-msg', _.bind(this.onSignalMessage, this));
         if (webrtcDetectedBrowser === 'firefox') {
             // Need to fetch media stream
             getUserMedia({audio:true, video:false, fake: true}, function (stream) {
-                self.sender.addStream(stream);
-            }, noop);
+                self.peer.addStream(stream);
+            }, _.bind(this.onError, this));
         }
-        this.sender = new RTCPeerConnection(servers, connectionOptions);
-        this.receiver = new RTCPeerConnection(servers, connectionOptions);
-        this.channel = this.sender.createDataChannel(this.name, {reliable: false});
-        this.channel.onmessage = _.bind(this.gotMessage, this);
-        this.channel.onopen = function () {
-            console.log('Channel Ready!');
-        }
-        this.channel.onerror = logerror;
-        this.sender.onconnection = function (e) {
-            console.log('Sender Data Channel');
-            self.trigger('channel-connection', [self.channel]);
-        };
-        this.offer = new $.Deferred();
+        this.peer = new RTCPeerConnection(servers, connectionOptions);
+        this.peer.onicecandidate = _.bind(this.onICECandiate, this);
+        this.channel = this.peer.createDataChannel(this.signal.room, {reliable: false});
+        this.channel.onmessage = _.bind(this.onChannelMessage, this);
+        this.channel.onopen = _.bind(this.onChannelOpen, this);
+        this.channel.onerror = _.bind(this.onError, this);
         this.ready = new $.Deferred();
-        this.sender.createOffer(function (e) {
-            self.sender.setLocalDescription(e, noop, logerror);
-            self.receiver.setRemoteDescription(e, noop, logerror);
-            self.offer.resolve(e);
-            self.trigger('local-offer', [e]);
-        }, noop);
         this.events = _.extend({}, Backbone.Events);
+        if (this.leader) {
+            this.peer.createOffer(
+                _.bind(this.onlocalDescription, this),
+                _.bind(this.onError, this)
+            );
+        }        
     }
 
     Channel.prototype.on = function (event, callback, context) {
@@ -47,58 +38,56 @@ var Channel = (function ($, _, Backbone, webrtcDetectedBrowser, getUserMedia, at
         this.events.trigger(event, args);
     };
 
-    Channel.prototype.acceptOffer = function (offer) {
-        var self = this;
-        this.offer.then(function () {
-            self.receiver.onaddstream = function (e) {
-                var el = new Audio();
-                el.autoplay = true;
-                attachMediaStream(el, e.stream);
-            };
-
-            self.receiver.ondatachannel = function (e) {
-                self.channel = e.channel || e;
-                self.ready.resolve(self.channel);
-                self.channel.onmessage = _.bind(self.gotMessage, self);
-            }
-
-            self.receiver.setRemoteDescription(new RTCSessionDescription(offer), noop, logerror);
-
-            self.receiver.onicecandidate = function (e) {
-                if (e.candidate) {
-                    self.sender.addIceCandidate(new RTCIceCandidate(e.candidate));
-                }
-            };
-
-            self.receiver.createAnswer(function (e) {
-                self.receiver.setLocalDescription(e);
-                self.trigger('local-answer', [e]);
-            }, noop);
-        });
+    Channel.prototype.onError = function (e) {
+        console.log('Caught Error');
+        console.log(e);
+        this.ready.reject(e);
     };
 
-    Channel.prototype.acceptAnswer = function (answer) {
-        var self = this;
-        this.receiver.setLocalDescription(new RTCSessionDescription(answer), noop, logerror);
-        this.sender.setRemoteDescription(new RTCSessionDescription(answer), noop, logerror);
+    Channel.prototype.onSignalMessage = function (msg) {
+        var data = JSON.parse(msg),
+            self = this;
+        if (data.sdp) {
+            this.peer.setRemoteDescription(new RTCSessionDescription(data.sdp), function () {
+                if (self.peer.remoteDescription.type === 'offer') {
+                    self.peer.createAnswer(
+                        _.bind(self.onlocalDescription, self),
+                        _.bind(self.onError, this)
+                    );
+                }
+            }, _.bind(this.onError, this));
+        } else if (data.candidate) {
+            this.peer.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+    };
 
-        this.sender.onicecandidate = function (e) {
-            if (e.candidate) {
-                self.receiver.addIceCandidate(new RTCIceCandidate(e.candidate));
-            }
-        };
+    Channel.prototype.onlocalDescription = function (desc) {
+        var self = this;
+        this.peer.setLocalDescription(desc, function () {
+            var message = JSON.stringify({'sdp': self.peer.localDescription});
+            self.signal.send(message);
+        }, _.bind(this.onError, this));
+    };
+
+    Channel.prototype.onICECandiate = function (e) {
+        var message = JSON.stringify({'candidate': e.candidate});
+        if (e.candidate) {
+            this.signal.send(message);
+        }
+    };
+
+    Channel.prototype.onChannelOpen = function () {
         this.ready.resolve(this.channel);
+    };
+
+    Channel.prototype.onChannelMessage = function (message) {
+        this.trigger('message', message);
     };
 
     Channel.prototype.send = function (message) {
         this.ready.then(function (channel) {
             channel.send(message);
         });
-    };
-
-    Channel.prototype.gotMessage = function (message) {
-        console.log('Channel Message: ' +  message);
-        this.trigger('message', [message]);
     };
 
     return Channel;
