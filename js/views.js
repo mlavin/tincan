@@ -69,7 +69,6 @@ var views = (function ($, _, Backbone, getUserMedia, Channel) {
             var self = this;
             this.channel = new Channel(this.server, false);
             this.channel.on('message', function (message) {
-                console.log(message.data);
                 self.channel.send('Pong');
             });
         },

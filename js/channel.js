@@ -1,9 +1,9 @@
 var Channel = (function ($, _, Backbone, webrtcDetectedBrowser, getUserMedia,
     RTCPeerConnection, RTCSessionDescription, RTCIceCandidate) {
-    var servers = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]},
-        connectionOptions = {optional: [{RtpDataChannels: true}]},
-        isChrome = webrtcDetectedBrowser === 'chrome',
+    var isChrome = webrtcDetectedBrowser === 'chrome',
         isFirefox = webrtcDetectedBrowser === 'firefox',
+        servers = {"iceServers": [{"url": "stun:stun.l.google.com:19302"}]},
+        connectionOptions = {},
         offerOptions = {
             optional: [],
             mandatory: {
@@ -17,12 +17,9 @@ var Channel = (function ($, _, Backbone, webrtcDetectedBrowser, getUserMedia,
         this.signal = signal;
         this.leader = leader;
         this.signal.on('peer-msg', _.bind(this.onSignalMessage, this));
-        
         this.peer = new RTCPeerConnection(servers, connectionOptions);
         this.peer.onicecandidate = _.bind(this.onICECandiate, this);
         this.peer.ondatachannel = _.bind(this.onDataChannel, this);
-        this.channel = this.peer.createDataChannel(this.signal.room, isChrome ? {reliable: false} : {});
-        this.onDataChannel({channel: this.channel});
         this.ready = new $.Deferred();
         this.events = _.extend({}, Backbone.Events);
         if (this.leader) {
@@ -35,6 +32,8 @@ var Channel = (function ($, _, Backbone, webrtcDetectedBrowser, getUserMedia,
                 }, _.bind(this.onError, this));
             } else {
                 this.stream.resolve(true);
+                this.channel = this.peer.createDataChannel(this.signal.room);
+                this.onDataChannel({channel: this.channel});
             }
             this.stream.done(function () {
                 self.peer.createOffer(
