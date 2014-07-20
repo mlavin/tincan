@@ -9,6 +9,15 @@
         <link rel="stylesheet" href="css/normalize.css">
         <link rel="stylesheet" href="css/main.css">
         <script src="vendor/modernizr-2.7.1.js"></script>
+        <script type="text/html" id="leader-room">
+            <h1>Welcome</h1>
+            <p>Drag a file to share it<p>
+            <p>Share this link to allow others to connect: <a href="#room/<%= room %>">Join Link</a><p>
+            <span id="peer-status">Not Connected</span>
+        </script>
+        <script type="text/html" id="peer-room">
+            <h1>Welcome</h1>
+        </script>
     </head>
     <body>
         <!--[if lt IE 8]>
@@ -27,14 +36,5 @@
         <script src="js/channel.js"></script>
         <script src="js/views.js"></script>
         <script src="js/main.js"></script>
-        <script type="text/html" id="leader-room">
-            <h1>Welcome</h1>
-            <p>Drag a file to share it<p>
-            <p>Share this link to allow others to connect: <a href="#room/<%= room %>">Join Link</a><p>
-            <span id="peer-status">Not Connected</span>
-        </script>
-        <script type="text/html" id="peer-room">
-            <h1>Welcome</h1>
-        </script>
     </body>
 </html>
