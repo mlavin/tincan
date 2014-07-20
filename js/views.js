@@ -1,4 +1,4 @@
-var views = (function ($, _, Backbone, getUserMedia, Channel) {
+var views = (function ($, _, Backbone, Channel) {
     var HomePageView = Backbone.View.extend({
         el: '#homepage',
         events: {
@@ -81,4 +81,4 @@ var views = (function ($, _, Backbone, getUserMedia, Channel) {
         leader: LeaderView,
         peer: PeerView,
     }
-})(jQuery, _, Backbone, getUserMedia, Channel);
+})(jQuery, _, Backbone, Channel);
