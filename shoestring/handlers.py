@@ -49,35 +49,46 @@ class SocketHandler(WebSocketHandler):
             self.application.remove_subscriber(self.channel, self)
 
 
-class CreateRoomHandler(RequestHandler):
+class RoomHandlerMixin(object):
+    """Helper methods for handling rooms."""
+
+    def build_room_token(self, room, user):
+        """Build a JSON web token for the room/user."""
+        return jwt.encode({
+            'room': room,
+            'uuid': user,
+            'exp': datetime.datetime.utcnow() +  datetime.timedelta(minutes=10)
+        }, self.settings['secret'])
+
+    def build_socket_url(self, room, user):
+        """Build socket url for connecting to the given room."""
+        token = self.build_room_token(room, user)
+        protocol = 'wss' if self.request.protocol == 'https' else 'ws'
+        return url_concat('{}://{}/socket'.format(protocol, self.request.host), {'token': token})
+
+
+class CreateRoomHandler(RoomHandlerMixin, RequestHandler):
     """Create rooms."""
 
     def post(self):
-        room = '{}'.format(random.SystemRandom().randint(10 ** 4, 10 ** 5 - 1))
-        token = jwt.encode({
-            'room': room,
-            'uuid': uuid.uuid4().hex,
-            'exp': datetime.datetime.utcnow() +  datetime.timedelta(minutes=10)
-        }, self.settings['secret'])
+        user = uuid.uuid4().hex
+        room = self.application.create_channel(user)
         result = {
             'room': room,
-            'socket': url_concat('ws://{}/socket'.format(self.request.host), {'token': token})
+            'socket': self.build_socket_url(room, user)
         }
         self.write(result)
 
 
-class GetRoomHandler(RequestHandler):
+class GetRoomHandler(RoomHandlerMixin, RequestHandler):
     """Join room."""
 
     def get(self, room):
-        token = jwt.encode({
-            'room': room,
-            'uuid': uuid.uuid4().hex,
-            'exp': datetime.datetime.utcnow() +  datetime.timedelta(minutes=10)
-        }, self.settings['secret'])
+        user = uuid.uuid4().hex
+        room = self.application.get_channel(room, user)
         result = {
             'room': room,
-            'socket': url_concat('ws://{}/socket'.format(self.request.host), {'token': token})
+            'socket': self.build_socket_url(room, user)
         }
         self.write(result)
 

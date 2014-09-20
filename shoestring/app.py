@@ -1,36 +1,10 @@
-import json
 import os
 
-from redis import Redis
+from importlib import import_module
+
 from tornado.web import Application
-from tornado.websocket import WebSocketClosedError
-from tornadoredis import Client
-from tornadoredis.pubsub import BaseSubscriber
 
 from .handlers import CreateRoomHandler, GetRoomHandler, SocketHandler, IndexHandler
-
-
-class RedisSubscriber(BaseSubscriber):
-
-    def on_message(self, msg):
-        """Handle new message on the Redis channel."""
-        if msg and msg.kind == 'message':
-            try:
-                message = json.loads(msg.body)
-                sender = message['sender']
-                message = message['message']
-            except (ValueError, KeyError):
-                logging.warning('Invalid channel mesage: {}'.format(msg.body))
-            else:
-                subscribers = list(self.subscribers[msg.channel].keys())
-                for subscriber in subscribers:
-                    if sender != subscriber.uuid:
-                        try:
-                            subscriber.write_message(message)
-                        except tornado.websocket.WebSocketClosedError:
-                            # Remove dead peer
-                            self.unsubscribe(msg.channel, subscriber)
-        super().on_message(msg)
 
 
 class ShoestringApplication(Application):
@@ -42,6 +16,13 @@ class ShoestringApplication(Application):
             (r'/socket$', SocketHandler),
             (r'/$', IndexHandler),
         ]
+        backend_name = kwargs.pop('backend', 'shoestring.backends.memory')
+        backend_module = import_module(backend_name)
+        try:
+            backend_class = getattr(backend_module, 'Backend')
+        except AttributeError as e:
+            msg = 'Module "{}" does not define a Backend class.'.format(backend_name)
+            raise ImportError(msg) from e
         settings = {
             'template_path': os.path.join(os.path.dirname(__file__), os.pardir, 'templates'),
             'static_path': os.path.join(os.path.dirname(__file__), os.pardir, 'static'),
@@ -50,18 +31,20 @@ class ShoestringApplication(Application):
         }
         settings.update(kwargs)
         super().__init__(routes, **settings)
-        self.subscriber = RedisSubscriber(Client())
-        self.publisher = Redis()
+        self.backend = backend_class()
+
+    # Pass through methods down to the backend
+    def create_channel(self, owner):
+        return self.backend.create_channel(owner)
+
+    def get_channel(self, name, user):
+        return self.backend.get_channel(name, user)
 
     def add_subscriber(self, channel, subscriber):
-        self.subscriber.subscribe(channel, subscriber)
+        self.backend.add_subscriber(channel, subscriber)
 
     def remove_subscriber(self, channel, subscriber):
-        self.subscriber.unsubscribe(channel, subscriber)
+        self.backend.remove_subscriber(channel, subscriber)
 
     def broadcast(self, message, channel, sender):
-        message = json.dumps({
-            'sender': sender,
-            'message': message
-        })
-        self.publisher.publish(channel, message)
+        self.backend.broadcast(message, channel, sender)

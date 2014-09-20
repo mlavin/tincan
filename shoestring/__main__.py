@@ -12,6 +12,7 @@ from .app import ShoestringApplication
 define('debug', default=False, type=bool, help='Run in debug mode')
 define('port', default=8080, type=int, help='Server port')
 define('allowed_hosts', multiple=True, help='Allowed hosts for cross domain connections')
+define('backend', default='memory', help='Backend for storing connections. Available choices: memory or redis')
 
 
 def shutdown(server):
