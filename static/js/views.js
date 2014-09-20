@@ -160,7 +160,7 @@
         connected: function (userid) {
             $('.loading', this.$el).fadeOut();
         }
-    }),
+    });
 
     app.HomepageView = Backbone.View.extend({
         el: '#home',

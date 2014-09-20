@@ -1,28 +1,53 @@
 import datetime
-import hashlib
+import json
 import logging
 import os
 import random
 import signal
 import time
+import uuid
 
-from collections import defaultdict
 from urllib.parse import urlparse
 
 import jwt
 
+from redis import Redis
 from tornado.httpserver import HTTPServer
 from tornado.httputil import url_concat
 from tornado.ioloop import IOLoop
 from tornado.options import define, parse_command_line, options
 from tornado.web import Application, RequestHandler
 from tornado.websocket import WebSocketHandler, WebSocketClosedError
+from tornadoredis import Client
+from tornadoredis.pubsub import BaseSubscriber
 
 
 define('debug', default=False, type=bool, help='Run in debug mode')
 define('port', default=8080, type=int, help='Server port')
-define('allowed_hosts', default="localhost:8080", multiple=True,
-       help='Allowed hosts for cross domain connections')
+define('allowed_hosts', multiple=True, help='Allowed hosts for cross domain connections')
+
+
+class RedisSubscriber(BaseSubscriber):
+
+    def on_message(self, msg):
+        """Handle new message on the Redis channel."""
+        if msg and msg.kind == 'message':
+            try:
+                message = json.loads(msg.body)
+                sender = message['sender']
+                message = message['message']
+            except (ValueError, KeyError):
+                logging.warning('Invalid channel mesage: {}'.format(msg.body))
+            else:
+                subscribers = list(self.subscribers[msg.channel].keys())
+                for subscriber in subscribers:
+                    if sender != subscriber.uuid:
+                        try:
+                            subscriber.write_message(message)
+                        except tornado.websocket.WebSocketClosedError:
+                            # Remove dead peer
+                            self.unsubscribe(msg.channel, subscriber)
+        super().on_message(msg)
 
 
 class SocketHandler(WebSocketHandler):
@@ -47,12 +72,13 @@ class SocketHandler(WebSocketHandler):
                 self.close()
             else:
                 self.channel = info['room']
+                self.uuid = info['uuid']
                 self.application.add_subscriber(self.channel, self)
 
     def on_message(self, message):
         """Broadcast updates to other interested clients."""
-        if self.channel is not None:
-            self.application.broadcast(message, channel=self.channel, sender=self)
+        if self.channel is not None and self.uuid is not None:
+            self.application.broadcast(message, channel=self.channel, sender=self.uuid)
 
     def on_close(self):
         """Remove subscription."""
@@ -67,6 +93,7 @@ class CreateRoomHandler(RequestHandler):
         room = '{}'.format(random.SystemRandom().randint(10 ** 4, 10 ** 5 - 1))
         token = jwt.encode({
             'room': room,
+            'uuid': uuid.uuid4().hex,
             'exp': datetime.datetime.utcnow() +  datetime.timedelta(minutes=10)
         }, self.settings['secret'])
         result = {
@@ -82,6 +109,7 @@ class GetRoomHandler(RequestHandler):
     def get(self, room):
         token = jwt.encode({
             'room': room,
+            'uuid': uuid.uuid4().hex,
             'exp': datetime.datetime.utcnow() +  datetime.timedelta(minutes=10)
         }, self.settings['secret'])
         result = {
@@ -115,30 +143,21 @@ class ShoestringApplication(Application):
         }
         settings.update(kwargs)
         super().__init__(routes, **settings)
-        self.subscriptions = defaultdict(list)
+        self.subscriber = RedisSubscriber(Client())
+        self.publisher = Redis()
 
     def add_subscriber(self, channel, subscriber):
-        self.subscriptions[channel].append(subscriber)
+        self.subscriber.subscribe(channel, subscriber)
 
     def remove_subscriber(self, channel, subscriber):
-        self.subscriptions[channel].remove(subscriber)
+        self.subscriber.unsubscribe(channel, subscriber)
 
-    def get_subscribers(self, channel):
-        return self.subscriptions[channel]
-
-    def broadcast(self, message, channel=None, sender=None):
-        if channel is None:
-            for c in self.subscriptions.keys():
-                self.broadcast(message, channel=c, sender=sender)
-        else:
-            peers = self.get_subscribers(channel)
-            for peer in peers:
-                if peer != sender:
-                    try:
-                        peer.write_message(message)
-                    except WebSocketClosedError:
-                        # Remove dead peer
-                        self.remove_subscriber(channel, peer)
+    def broadcast(self, message, channel, sender):
+        message = json.dumps({
+            'sender': sender,
+            'message': message
+        })
+        self.publisher.publish(channel, message)
 
 
 def shutdown(server):
