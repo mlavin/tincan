@@ -13,7 +13,14 @@ from tornado.web import RequestHandler
 from tornado.websocket import WebSocketHandler
 
 
-class SocketHandler(WebSocketHandler):
+class BackendMixin(object):
+    """Mixin class for accepting the backend on creation."""
+
+    def initialize(self, backend):
+        self.backend = backend
+
+
+class SocketHandler(BackendMixin, WebSocketHandler):
     """Websocket signal handler."""
 
     def check_origin(self, origin):
@@ -36,17 +43,17 @@ class SocketHandler(WebSocketHandler):
             else:
                 self.channel = info['room']
                 self.uuid = info['uuid']
-                self.application.add_subscriber(self.channel, self)
+                self.backend.add_subscriber(self.channel, self)
 
     def on_message(self, message):
         """Broadcast updates to other interested clients."""
         if self.channel is not None and self.uuid is not None:
-            self.application.broadcast(message, channel=self.channel, sender=self.uuid)
+            self.backend.broadcast(message, channel=self.channel, sender=self.uuid)
 
     def on_close(self):
         """Remove subscription."""
         if self.channel is not None:
-            self.application.remove_subscriber(self.channel, self)
+            self.backend.remove_subscriber(self.channel, self)
 
 
 class RoomHandlerMixin(object):
@@ -67,12 +74,12 @@ class RoomHandlerMixin(object):
         return url_concat('{}://{}/socket'.format(protocol, self.request.host), {'token': token})
 
 
-class CreateRoomHandler(RoomHandlerMixin, RequestHandler):
+class CreateRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
     """Create rooms."""
 
     def post(self):
         user = uuid.uuid4().hex
-        room = self.application.create_channel(user)
+        room = self.backend.create_channel(user)
         result = {
             'room': room,
             'socket': self.build_socket_url(room, user)
@@ -80,12 +87,12 @@ class CreateRoomHandler(RoomHandlerMixin, RequestHandler):
         self.write(result)
 
 
-class GetRoomHandler(RoomHandlerMixin, RequestHandler):
+class GetRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
     """Join room."""
 
     def get(self, room):
         user = uuid.uuid4().hex
-        room = self.application.get_channel(room, user)
+        room = self.backend.get_channel(room, user)
         result = {
             'room': room,
             'socket': self.build_socket_url(room, user)

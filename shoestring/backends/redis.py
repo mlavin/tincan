@@ -8,7 +8,7 @@ try:
     from redis import Redis
     from tornadoredis import Client
     from tornadoredis.pubsub import BaseSubscriber
-except ImportError as e
+except ImportError as e:
     msg = 'The redis backend requires installing redis-py and tornado-redis.'
     raise ImportError(msg) from e
 

@@ -12,7 +12,7 @@ from .app import ShoestringApplication
 define('debug', default=False, type=bool, help='Run in debug mode')
 define('port', default=8080, type=int, help='Server port')
 define('allowed_hosts', multiple=True, help='Allowed hosts for cross domain connections')
-define('backend', default='memory', help='Backend for storing connections. Available choices: memory or redis')
+define('backend', default='shoestring.backends.memory', help='Backend for storing connections.')
 
 
 def shutdown(server):
@@ -29,7 +29,7 @@ def shutdown(server):
 
 def main():
     parse_command_line()
-    application = ShoestringApplication(debug=options.debug)
+    application = ShoestringApplication(debug=options.debug, backend=options.backend)
     server = HTTPServer(application)
     server.listen(options.port)
     signal.signal(signal.SIGINT, lambda sig, frame: shutdown(server))
