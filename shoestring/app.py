@@ -1,7 +1,10 @@
+import logging
 import os
+import time
 
 from importlib import import_module
 
+from tornado.ioloop import IOLoop
 from tornado.web import Application
 
 from .handlers import CreateRoomHandler, GetRoomHandler, SocketHandler, IndexHandler
@@ -28,7 +31,11 @@ class ShoestringApplication(Application):
             'template_path': os.path.join(os.path.dirname(__file__), os.pardir, 'templates'),
             'static_path': os.path.join(os.path.dirname(__file__), os.pardir, 'static'),
             'static_url_prefix': '/static/',
-            'secret': os.environ.get('SHOESTRING_SECRET_KEY', os.urandom(75)),
+            'secret': os.environ.get('SHOESTRING_SECRET_KEY', str(os.urandom(75))),
         }
         settings.update(kwargs)
         super().__init__(routes, **settings)
+
+    def shutdown(self):
+        """Graceful shutdown of the application server."""
+        pass
