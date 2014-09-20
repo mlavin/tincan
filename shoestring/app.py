@@ -28,7 +28,7 @@ class ShoestringApplication(Application):
             'template_path': os.path.join(os.path.dirname(__file__), os.pardir, 'templates'),
             'static_path': os.path.join(os.path.dirname(__file__), os.pardir, 'static'),
             'static_url_prefix': '/static/',
-            'secret': 'XXXXXXXXX',
+            'secret': os.environ.get('SHOESTRING_SECRET_KEY', os.urandom(75)),
         }
         settings.update(kwargs)
         super().__init__(routes, **settings)
