@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Tincan.IO - Simple File Sharing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="Mark Lavin">
+    <link href="{{ static_url('css/tincan.css') }}" rel="stylesheet">
+    <script type="text/html" id="upload-template">
+        <div class="upload">Drap your files here.</div>
+        <div class="log"></div>
+    </script>
+    <script type="text/html" id="upload-file-template">
+        <%= name %>
+    </script>
+    <script type="text/html" id="receiver-template">
+        <div class="loading">Establishing connection.</div>
+    </script>
+    <script type="text/html" id="recieve-file-template">
+        <%= name %>
+        <% if (!accepted) { %>
+            <a class="accept" data-id="<%= id %>" href="#">Accept</a>
+        <% } else if (progress && progress.uuid) { %>
+            <progress min="0" max="<%= progress.remaining + progress.received %>" value="<%= progress.received %>"></progress>
+        <% } %>
+        <% if (url) { %>
+            <a class="download" href="<%= url %>" target="_blank" download="<%= name %>">Download</a>
+        <% } %>
+    </script>
+    <script type="text/html" id="error-message-template">
+        <div class="error"><%= message %></div>
+    </script>
+</head>
+<body>
+    <div id="home">
+        <div class="splash">
+            <h1 class="splash-head">Tincan.IO</h1>
+            <p class="splash-subhead">It's just that simple</p>
+            <p>
+                <a href="#" class="button">Initiate transfer</a>
+            </p>
+        </div>
+    </div>
+    <div id="room">
+        <div id="files"></div>
+    </div>
+    <script id="config" type="text/json">
+        {
+            "views": {},
+            "rooms": null,
+            "router": null,
+            "roomsURL": "/rooms"
+        }
+    </script>
+    <script src="{{ static_url('vendor/DataChannel.js') }}"></script>
+    <script src="{{ static_url('vendor/jquery.js') }}"></script>
+    <script src="{{ static_url('vendor/underscore.js') }}"></script>
+    <script src="{{ static_url('vendor/backbone.js') }}"></script>
+    <script src="{{ static_url('js/app.js') }}"></script>
+    <script src="{{ static_url('js/models.js') }}"></script>
+    <script src="{{ static_url('js/views.js') }}"></script>
+    <script src="{{ static_url('js/router.js') }}"></script>
+</body>
+</html>
