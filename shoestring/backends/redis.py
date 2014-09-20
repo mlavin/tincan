@@ -59,7 +59,7 @@ class Backend(BaseBackend):
 
     def remove_subscriber(self, channel, subscriber):
         self.subscriber.unsubscribe(channel, subscriber)
-        if len(list(self.subscribers[msg.channel].keys())) == 0:
+        if len(list(self.subscriber[channel].keys())) == 0:
             self.remove_channel(channel)
 
     def broadcast(self, message, channel, sender):
