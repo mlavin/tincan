@@ -22,5 +22,13 @@ class BaseBackend(object):
     def remove_subscriber(self, channel, subscriber):
         raise NotImplementedError('Define in a subclass.')
 
+    def get_subscribers(self, channel=None):
+        raise NotImplementedError('Define in a subclass.')
+
     def broadcast(self, message, channel, sender):
         raise NotImplementedError('Define in a subclass.')
+
+    def shutdown(self, graceful=True):
+        for subscriber in self.get_subscribers():
+            code = 4200 if graceful else 4100
+            subscriber.close(code=code, reason='Server shutdown.')

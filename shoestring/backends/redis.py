@@ -59,8 +59,16 @@ class Backend(BaseBackend):
 
     def remove_subscriber(self, channel, subscriber):
         self.subscriber.unsubscribe(channel, subscriber)
-        if len(list(self.subscriber[channel].keys())) == 0:
+        if len(self.get_subscribers(channel)) == 0:
             self.remove_channel(channel)
+
+    def get_subscribers(self, channel=None):
+        if channel is not None:
+            return list(self.subscriber.subscribers[channel].keys())
+        else:
+            for subscribers in self.subscriber.subscribers.values():
+                for s in subscribers:
+                    yield s
 
     def broadcast(self, message, channel, sender):
         message = json.dumps({
@@ -68,3 +76,8 @@ class Backend(BaseBackend):
             'message': message
         })
         self.publisher.publish(channel, message)
+
+    def shutdown(self, graceful=True):
+        super().shutdown(graceful=graceful)
+        self.subscriber.close()
+        self.publisher.connection_pool.disconnect()

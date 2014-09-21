@@ -35,11 +35,19 @@ class Backend(BaseBackend):
 
     def remove_subscriber(self, channel, subscriber):
         self._subscriptions[channel].append(subscriber)
-        if len(self._subscriptions[channel]) == 0:
+        if len(self.get_subscribers(channel)) == 0:
             self.remove_channel(channel)
 
+    def get_subscribers(self, channel=None):
+        if channel is not None:
+            return self._subscriptions[channel]
+        else:
+            for participants in self._subscriptions.values():
+                for p in participants:
+                    yield p
+
     def broadcast(self, message, channel, sender):
-        peers = self._subscriptions[channel]
+        peers = self.get_subscribers(channel)
         for peer in peers:
             if peer != sender:
                 try:
@@ -47,3 +55,6 @@ class Backend(BaseBackend):
                 except WebSocketClosedError:
                     # Remove dead peer
                     self.remove_subscriber(channel, peer)
+
+    def shutdown(self, graceful=True):
+        super().shutdown(graceful=graceful)

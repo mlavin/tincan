@@ -19,33 +19,31 @@ define('graceful', default=10, type=int, help='Max number of seconds to wait for
 
 def shutdown(server, application, graceful=True):
     ioloop = IOLoop.instance()
-    logging.info('Stopping server...')
-    server.stop()
-    logging.info('Stopping application...')
-    application.shutdown()
+    if getattr(server, '_stopping', False):
+        graceful = False
+    else:
+        server._stopping = True
+        logging.info('Stopping server...')
+        server.stop()
+        logging.info('Stopping application...')
+        application.shutdown()
 
     def finalize():
         ioloop.stop()
         logging.info('Stopped.')
         sys.exit(0)
 
-    def poll(counts={'remaining': None, 'previous': None}):
-        remaining = len(ioloop._handlers)
-        counts['remaining'], counts['previous'] = remaining, counts['remaining']
-        previous = counts['previous']
-        # Wait until we only have only one IO handler remaining.  That
-        # final handler will be our PeriodicCallback polling task.
-        if remaining == 1:
+    deadline = time.time() + options.graceful
+
+    def poll():
+        now = time.time()
+        if now < deadline and (ioloop._callbacks or ioloop._timeouts):
+            ioloop.add_timeout(now + 1, poll)
+        else:
             finalize()
-        if previous is None or remaining != previous:
-            logging.info("Waiting on IO %d remaining handlers", remaining)   
 
     if graceful:
-        # Callback to check on remaining handlers.
-        poller = PeriodicCallback(poll, 250, io_loop=ioloop)
-        poller.start()
-
-        ioloop.add_timeout(time.time() + options.graceful, finalize)
+        poll()
     else:
         finalize()
 

@@ -20,11 +20,11 @@ class ShoestringApplication(Application):
         except AttributeError as e:
             msg = 'Module "{}" does not define a Backend class.'.format(backend_name)
             raise ImportError(msg) from e
-        backend = backend_class()
+        self.backend = backend_class()
         routes = [
-            (r'/rooms$', CreateRoomHandler, {'backend': backend}),
-            (r'/rooms/(?P<room>[0-9]+)$', GetRoomHandler, {'backend': backend}),
-            (r'/socket$', SocketHandler, {'backend': backend}),
+            (r'/rooms$', CreateRoomHandler, {'backend': self.backend}),
+            (r'/rooms/(?P<room>[0-9]+)$', GetRoomHandler, {'backend': self.backend}),
+            (r'/socket$', SocketHandler, {'backend': self.backend}),
             (r'/$', IndexHandler),
         ]
         settings = {
@@ -36,6 +36,6 @@ class ShoestringApplication(Application):
         settings.update(kwargs)
         super().__init__(routes, **settings)
 
-    def shutdown(self):
-        """Graceful shutdown of the application server."""
-        pass
+    def shutdown(self, graceful=True):
+        """Shutdown of the application server. Might be immediate or graceful."""
+        self.backend.shutdown(graceful=graceful)
