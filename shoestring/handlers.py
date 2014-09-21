@@ -9,7 +9,7 @@ import jwt
 
 from tornado.httputil import url_concat
 from tornado.options import options
-from tornado.web import RequestHandler
+from tornado.web import RequestHandler, HTTPError
 from tornado.websocket import WebSocketHandler
 
 
@@ -34,12 +34,12 @@ class SocketHandler(BackendMixin, WebSocketHandler):
         self.channel = None
         token = self.get_argument('token', None)
         if not token:
-            self.close()
+            self.close(code=4000, reason='Missing token.')
         else:
             try:
                 info = jwt.decode(token, self.settings['secret'])
             except (jwt.DecodeError, jwt.ExpiredSignature):
-                self.close()
+                self.close(code=4000, reason='Invalid token.')
             else:
                 self.channel = info['room']
                 self.uuid = info['uuid']
@@ -92,7 +92,10 @@ class GetRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
 
     def get(self, room):
         user = uuid.uuid4().hex
-        room = self.backend.get_channel(room, user)
+        try:
+            room = self.backend.get_channel(room, user)
+        except KeyError:
+            raise HTTPError(404)
         result = {
             'room': room,
             'socket': self.build_socket_url(room, user)
