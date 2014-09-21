@@ -55,6 +55,3 @@ class Backend(BaseBackend):
                 except WebSocketClosedError:
                     # Remove dead peer
                     self.remove_subscriber(channel, peer)
-
-    def shutdown(self, graceful=True):
-        super().shutdown(graceful=graceful)
