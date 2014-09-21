@@ -55,6 +55,7 @@ def main():
     server.listen(options.port)
     signal.signal(signal.SIGINT, lambda sig, frame: shutdown(server, application, graceful=True))
     signal.signal(signal.SIGTERM, lambda sig, frame: shutdown(server, application, graceful=True))
+    signal.signal(signal.SIGALRM, lambda sig, frame: shutdown(server, application, graceful=True))
     signal.signal(signal.SIGQUIT, lambda sig, frame: shutdown(server, application, graceful=False))
     logging.info('Starting server on localhost:%d', options.port)
     IOLoop.instance().start()

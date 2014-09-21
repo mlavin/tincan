@@ -1,5 +1,7 @@
 import datetime
 import json
+import logging
+import signal
 
 from tornado.websocket import WebSocketClosedError
 
@@ -18,7 +20,10 @@ class RedisSubscriber(BaseSubscriber):
 
     def on_message(self, msg):
         """Handle new message on the Redis channel."""
-        if msg and msg.kind == 'message':
+        if not msg:
+            return
+
+        if msg.kind == 'message':
             try:
                 message = json.loads(msg.body)
                 sender = message['sender']
@@ -34,7 +39,11 @@ class RedisSubscriber(BaseSubscriber):
                         except tornado.websocket.WebSocketClosedError:
                             # Remove dead peer
                             self.unsubscribe(msg.channel, subscriber)
-        super().on_message(msg)
+        elif msg.kind == 'disconnect':
+            # Disconnected from the Redis server
+            # Trigger a graceful shutdown
+            logging.warn('Dropped Redis connection.')
+            signal.alarm(1)
 
 
 class Backend(BaseBackend):
