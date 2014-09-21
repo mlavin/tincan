@@ -34,8 +34,47 @@
             var result = JSON.parse(message.data);
             this.trigger('message', result, message);
         },
-        onclose: function () {
+        onclose: function (e) {
+            var next = null,
+                step = 0,
+                count = 0,
+                callback;
+            console.debug('Websocket connection closed. ', e.reason);
             this.close();
+            if (4200 <= e.code && e.code < 4299) {
+                // Fast reconnect with slow backoff
+                next = 100;
+                step = 10;
+            } else if (4100 <= e.code && e.code < 4199) {
+                // Reconnect after a few seconds and backoff quickly
+                next = 2000;
+                step = 1000;
+            }
+            if (next !== null) {
+                this.on('open', function () {
+                    next = null;
+                    this.off('open');
+                    this.off('error');
+                }, this);
+                callback = $.proxy(function () {
+                    count = count + 1;
+                    next = next + step * count;
+                    if (count < 1000) {
+                        console.debug('Connect retry number ', count);
+                        this.open();
+                    } else {
+                        next = null;
+                        console.debug('Giving up on reconnection after ', count, ' attempts.');
+                    }
+                }, this);
+                this.on('error', function () {
+                    setTimeout(callback, next);
+                }, this);
+                setTimeout(callback, next);
+            } else {
+                this.off('open');
+                this.off('error');
+            }
         },
         onerror: function (error) {
             this.trigger('error', error);
