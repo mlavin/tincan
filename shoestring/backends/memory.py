@@ -15,6 +15,8 @@ class Backend(BaseBackend):
 
     def create_channel(self, owner):
         room = self._get_random_name()
+        while room not in self._rooms:
+            room = self._get_random_name()
         self._rooms.append(room)
         return room
 
