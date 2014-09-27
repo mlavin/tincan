@@ -41,7 +41,7 @@ class SocketHandler(BackendMixin, WebSocketHandler):
     def _get_channel(self):
         token = self.get_argument('token', None)
         if not token:
-            raise TokenError(code=4000, reason='Missing token.')
+            raise TokenError(code=4300, reason='Missing token.')
         try:
             info = jwt.decode(token, self.settings['secret'])
         except (jwt.DecodeError, jwt.ExpiredSignature):
@@ -50,7 +50,7 @@ class SocketHandler(BackendMixin, WebSocketHandler):
         try:
             members = self.backend.get_room(info['room'])
         except KeyError:
-            raise TokenError(code=4000, reason='Invalid channel.')
+            raise TokenError(code=4300, reason='Invalid channel.')
         else:  
             if channel is None or channel == info['room']:
                 channel = info['room']
@@ -59,7 +59,7 @@ class SocketHandler(BackendMixin, WebSocketHandler):
             elif channel in members:
                 channel = channel
             else:
-                raise TokenError(code=4000, reason='Invalid channel.')
+                raise TokenError(code=4300, reason='Invalid channel.')
             uuid = info['uuid']
             return (channel, uuid)
 
@@ -75,7 +75,7 @@ class SocketHandler(BackendMixin, WebSocketHandler):
                 self.backend.add_subscriber(self.channel, self)
             except ValueError:
                 self.channel, self.uuid = None, None
-                self.close(code=e.code, reason=e.reason)
+                self.close(code=4300, reason='Invalid channel.')
 
     def on_message(self, message):
         """Broadcast updates to other interested clients."""
