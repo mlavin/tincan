@@ -13,31 +13,31 @@ class Backend(BaseBackend):
         self._rooms = defaultdict(dict)
         self._subscriptions = defaultdict(list)
 
-    def create_channel(self, user):
+    def create_room(self, user):
         room = self._get_random_name()
         while room in self._rooms:
             room = self._get_random_name()
         self._rooms[room][user] = False
         return room
 
-    def get_channel(self, name, user):
+    def join_room(self, name, user):
         if name in self._rooms:
             self._rooms[name][user] = False
             return name
         else:
             raise KeyError('Unknown room.')
 
-    def remove_channel(self, name):
+    def get_room(self, name):
+        if name in self._rooms:
+            return self._rooms[name]
+        else:
+            raise KeyError('Unknown room.')
+
+    def remove_room(self, name):
         try:
             del self._rooms[name]
         except KeyError:
             pass
-
-    def get_members(self, channel):
-        if channel in self._rooms:
-            return self._rooms[channel].keys()
-        else:
-            raise KeyError('Unknown room.')
         
     def add_subscriber(self, channel, subscriber):
         if self._rooms.get(channel, {}).get(subscriber.uuid, False):

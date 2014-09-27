@@ -21,6 +21,14 @@ class BackendMixin(object):
         self.backend = backend
 
 
+class TokenError(Exception):
+
+    def __init__(self, code, reason):
+        self.code = code
+        self.reason = reason
+        super().__init__('Invalid Token: {} ({})'.format(reason, code))
+
+
 class SocketHandler(BackendMixin, WebSocketHandler):
     """Websocket signal handler."""
 
@@ -30,38 +38,48 @@ class SocketHandler(BackendMixin, WebSocketHandler):
         matched = any(parsed.netloc == host for host in options.allowed_hosts)
         return options.debug or allowed or matched
 
-    def open(self):
-        """Subscribe to channel updates on a new connection."""
-        self.channel = None
+    def _get_channel(self):
         token = self.get_argument('token', None)
         if not token:
-            self.close(code=4000, reason='Missing token.')
+            raise TokenError(code=4000, reason='Missing token.')
+        try:
+            info = jwt.decode(token, self.settings['secret'])
+        except (jwt.DecodeError, jwt.ExpiredSignature):
+            raise TokenError(code=4000, reason='Invalid token.')
+        channel = self.get_argument('channel', None)
+        try:
+            members = self.backend.get_room(info['room'])
+        except KeyError:
+            raise TokenError(code=4000, reason='Invalid channel.')
+        else:  
+            if channel is None or channel == info['room']:
+                channel = info['room']
+            elif channel == info['uuid']:
+                channel = info['uuid']
+            elif channel in members:
+                channel = channel
+            else:
+                raise TokenError(code=4000, reason='Invalid channel.')
+            uuid = info['uuid']
+            return (channel, uuid)
+
+    def open(self):
+        """Subscribe to channel updates on a new connection."""
+        try:
+            self.channel, self.uuid = self._get_channel()
+        except TokenError as e:
+            self.channel, self.uuid = None, None
+            self.close(code=e.code, reason=e.reason)
         else:
             try:
-                info = jwt.decode(token, self.settings['secret'])
-            except (jwt.DecodeError, jwt.ExpiredSignature):
-                self.close(code=4000, reason='Invalid token.')
-            else:
-                channel = self.get_argument('channel', None)
-                if channel is None or channel == info['room']:
-                    self.channel = info['room']
-                elif channel == info['uuid']:
-                    self.channel = info['uuid']
-                elif channel in self.backend.get_members(info['room']):
-                    # Validate the channel as another user's uuid
-                    self.channel = channel
-                else:
-                    self.close(code=4000, reason='Invalid channel.')
-                self.uuid = info['uuid']
-                try:
-                    self.backend.add_subscriber(self.channel, self)
-                except ValueError:
-                    self.close(code=4000, reason='Invalid token.')
+                self.backend.add_subscriber(self.channel, self)
+            except ValueError:
+                self.channel, self.uuid = None, None
+                self.close(code=e.code, reason=e.reason)
 
     def on_message(self, message):
         """Broadcast updates to other interested clients."""
         if self.channel is not None and self.uuid is not None:
-            logging.info('Message %s', message)
             self.backend.broadcast(message, channel=self.channel, sender=self.uuid)
 
     def on_close(self):
@@ -92,7 +110,7 @@ class CreateRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
 
     def post(self):
         user = uuid.uuid4().hex
-        room = self.backend.create_channel(user)
+        room = self.backend.create_room(user)
         result = {
             'room': room,
             'user': user,
@@ -108,7 +126,7 @@ class GetRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
     def get(self, room):
         user = uuid.uuid4().hex
         try:
-            room = self.backend.get_channel(room, user)
+            room = self.backend.join_room(room, user)
         except KeyError:
             raise HTTPError(404)
         result = {

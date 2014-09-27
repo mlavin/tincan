@@ -10,10 +10,13 @@ class BaseBackend(object):
         upper = 10 ** length - 1
         return '{}'.format(random.SystemRandom().randint(lower, upper))
 
-    def create_channel(self, owner):
+    def create_room(self, owner):
         raise NotImplementedError('Define in a subclass.')
 
-    def get_channel(self, name, user):
+    def join_room(self, name, user):
+        raise NotImplementedError('Define in a subclass.')
+
+    def get_room(self, name):
         raise NotImplementedError('Define in a subclass.')
 
     def add_subscriber(self, channel, subscriber):
