@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 import random
 import uuid
@@ -41,13 +42,26 @@ class SocketHandler(BackendMixin, WebSocketHandler):
             except (jwt.DecodeError, jwt.ExpiredSignature):
                 self.close(code=4000, reason='Invalid token.')
             else:
-                self.channel = info['room']
+                channel = self.get_argument('channel', None)
+                if channel is None or channel == info['room']:
+                    self.channel = info['room']
+                elif channel == info['uuid']:
+                    self.channel = info['uuid']
+                elif channel in self.backend.get_members(info['room']):
+                    # Validate the channel as another user's uuid
+                    self.channel = channel
+                else:
+                    self.close(code=4000, reason='Invalid channel.')
                 self.uuid = info['uuid']
-                self.backend.add_subscriber(self.channel, self)
+                try:
+                    self.backend.add_subscriber(self.channel, self)
+                except ValueError:
+                    self.close(code=4000, reason='Invalid token.')
 
     def on_message(self, message):
         """Broadcast updates to other interested clients."""
         if self.channel is not None and self.uuid is not None:
+            logging.info('Message %s', message)
             self.backend.broadcast(message, channel=self.channel, sender=self.uuid)
 
     def on_close(self):
@@ -64,14 +78,13 @@ class RoomHandlerMixin(object):
         return jwt.encode({
             'room': room,
             'uuid': user,
-            'exp': datetime.datetime.utcnow() +  datetime.timedelta(minutes=10)
-        }, self.settings['secret'])
+            'exp': datetime.datetime.utcnow() +  datetime.timedelta(hours=8)
+        }, self.settings['secret']).decode('utf-8')
 
-    def build_socket_url(self, room, user):
-        """Build socket url for connecting to the given room."""
-        token = self.build_room_token(room, user)
+    def build_socket_url(self):
+        """Build socket url."""
         protocol = 'wss' if self.request.protocol == 'https' else 'ws'
-        return url_concat('{}://{}/socket'.format(protocol, self.request.host), {'token': token})
+        return '{}://{}/socket'.format(protocol, self.request.host)
 
 
 class CreateRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
@@ -82,7 +95,9 @@ class CreateRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
         room = self.backend.create_channel(user)
         result = {
             'room': room,
-            'socket': self.build_socket_url(room, user)
+            'user': user,
+            'token': self.build_room_token(room, user),
+            'socket': self.build_socket_url()
         }
         self.write(result)
 
@@ -98,7 +113,9 @@ class GetRoomHandler(BackendMixin, RoomHandlerMixin, RequestHandler):
             raise HTTPError(404)
         result = {
             'room': room,
-            'socket': self.build_socket_url(room, user)
+            'user': user,
+            'token': self.build_room_token(room, user),
+            'socket': self.build_socket_url()
         }
         self.write(result)
 

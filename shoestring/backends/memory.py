@@ -10,39 +10,54 @@ class Backend(BaseBackend):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._rooms = []
+        self._rooms = defaultdict(dict)
         self._subscriptions = defaultdict(list)
 
-    def create_channel(self, owner):
+    def create_channel(self, user):
         room = self._get_random_name()
-        while room not in self._rooms:
+        while room in self._rooms:
             room = self._get_random_name()
-        self._rooms.append(room)
+        self._rooms[room][user] = False
         return room
 
     def get_channel(self, name, user):
         if name in self._rooms:
+            self._rooms[name][user] = False
             return name
         else:
             raise KeyError('Unknown room.')
 
     def remove_channel(self, name):
         try:
-            self._rooms.remove(name)
-        except ValueError:
+            del self._rooms[name]
+        except KeyError:
             pass
 
+    def get_members(self, channel):
+        if channel in self._rooms:
+            return self._rooms[channel].keys()
+        else:
+            raise KeyError('Unknown room.')
+        
     def add_subscriber(self, channel, subscriber):
+        if self._rooms.get(channel, {}).get(subscriber.uuid, False):
+            raise ValueError('Already subscribed.')
+        else:
+            self._rooms.get(channel, {})[subscriber.uuid] = True
         self._subscriptions[channel].append(subscriber)
 
+
     def remove_subscriber(self, channel, subscriber):
-        self._subscriptions[channel].append(subscriber)
-        if len(self.get_subscribers(channel)) == 0:
-            self.remove_channel(channel)
+        try:
+            self._subscriptions[channel].remove(subscriber)
+        except ValueError:
+            pass
+        else:
+            self._rooms.get(channel, {})[subscriber.uuid] = False
 
     def get_subscribers(self, channel=None):
         if channel is not None:
-            return self._subscriptions[channel]
+            yield from self._subscriptions[channel]
         else:
             for participants in self._subscriptions.values():
                 for p in participants:
