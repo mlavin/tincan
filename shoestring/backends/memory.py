@@ -32,12 +32,6 @@ class Backend(BaseBackend):
             return self._rooms[name]
         else:
             raise KeyError('Unknown room.')
-
-    def remove_room(self, name):
-        try:
-            del self._rooms[name]
-        except KeyError:
-            pass
         
     def add_subscriber(self, channel, subscriber):
         if self._rooms.get(channel, {}).get(subscriber.uuid, False):

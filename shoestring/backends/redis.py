@@ -59,44 +59,56 @@ class Backend(BaseBackend):
     def _room_key(self, name):
         return self.KEY_FORMAT.format(name)
 
-    def create_channel(self, owner):
+    def create_room(self, owner):
         created = False
         while not created:
             room = self._get_random_name()
             key = self._room_key(room)
-            created = self.publisher.hsetnx(key, 'owner', owner)
-            # Set the room to expire in an hour
-            self.publisher.expire(key, datetime.timedelta(hours=1))
+            if not self.publisher.exists(key):
+                created = True
+                self.publisher.hset(key, owner, '')
+                # Set the room to expire in an hour
+                self.publisher.expire(key, datetime.timedelta(hours=1))
         return room
 
-    def get_channel(self, name, user):
+    def join_room(self, name, user):
         key = self._room_key(name)
         if self.publisher.exists(key):
+            self.publisher.hset(key, user, '')
             return name
         else:
             raise KeyError('Unknown room.')
 
-    def remove_channel(self, name):
+    def get_room(self, name):
         key = self._room_key(name)
-        self.publisher.delete(key)
+        result = self.publisher.hgetall(key)
+        if not result:
+            raise KeyError('Unknown room.')
+        members = {}
+        for key, value in result.items():
+            members[key.decode('utf-8')] = bool(value)
+        return members
 
     def add_subscriber(self, channel, subscriber):
         self.subscriber.subscribe(channel, subscriber)
         key = self._room_key(channel)
-        if self.publisher.hincrby(key, 'members', amount=1) > 0:
+        if self.publisher.exists(key):
+            self.publisher.hset(key, subscriber.uuid, 'subscribed')
             # Remove any expiry on the room
             self.publisher.persist(key)
 
     def remove_subscriber(self, channel, subscriber):
         self.subscriber.unsubscribe(channel, subscriber)
         key = self._room_key(channel)
-        if self.publisher.hincrby(key, 'members', amount=-1) <= 0:
-            # Set the room to expire in an hour
-            self.publisher.expire(key, datetime.timedelta(hours=1))
+        if self.publisher.exists(key):
+            self.publisher.hset(key, subscriber.uuid, '')
+            if not any(self.publisher.hvals(key)):
+                # Set the room to expire in an hour
+                self.publisher.expire(key, datetime.timedelta(hours=1))
 
     def get_subscribers(self, channel=None):
         if channel is not None:
-            return list(self.subscriber.subscribers[channel].keys())
+            yield from self.subscriber.subscribers[channel].keys()
         else:
             for subscribers in self.subscriber.subscribers.values():
                 for s in subscribers:
