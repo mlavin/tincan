@@ -10,25 +10,25 @@ class BaseBackend(object):
         upper = 10 ** length - 1
         return '{}'.format(random.SystemRandom().randint(lower, upper))
 
-    def create_room(self, owner):
+    def create_room(self, owner):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
-    def join_room(self, name, user):
+    def join_room(self, name, user):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
-    def get_room(self, name):
+    def get_room(self, name):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
-    def add_subscriber(self, channel, subscriber):
+    def add_subscriber(self, channel, subscriber):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
-    def remove_subscriber(self, channel, subscriber):
+    def remove_subscriber(self, channel, subscriber):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
-    def get_subscribers(self, channel=None):
+    def get_subscribers(self, channel=None):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
-    def broadcast(self, message, channel, sender):
+    def broadcast(self, message, channel, sender):  # pragma: no cover
         raise NotImplementedError('Define in a subclass.')
 
     def shutdown(self, graceful=True):
