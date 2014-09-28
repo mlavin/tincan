@@ -101,7 +101,7 @@ class BackendAPIMixin(object):
         peer = self.get_socket()
         self.backend.add_subscriber('123', socket)
         self.backend.add_subscriber('123', peer)
-        self.backend.broadcast(message='ping', channel='123', sender=socket)
+        self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
         peer.write_message.assert_called_with('ping')
         self.assertFalse(socket.write_message.called)
 
@@ -111,7 +111,7 @@ class BackendAPIMixin(object):
         peer = self.get_socket()
         self.backend.add_subscriber('123', socket)
         self.backend.add_subscriber('456', peer)
-        self.backend.broadcast(message='ping', channel='123', sender=socket)
+        self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
         self.assertFalse(peer.write_message.called)
         self.assertFalse(socket.write_message.called)
 
@@ -119,7 +119,7 @@ class BackendAPIMixin(object):
         """Broadcast message into empty channel."""
         socket = self.get_socket()
         peer = self.get_socket()
-        self.backend.broadcast(message='ping', channel='123', sender=socket)
+        self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
         self.assertFalse(peer.write_message.called)
         self.assertFalse(socket.write_message.called)
 
@@ -132,7 +132,7 @@ class BackendAPIMixin(object):
         self.backend.add_subscriber('123', peer)
         result = self.backend.get_subscribers(channel='123')
         self.assertEqual(list(result), [socket, peer])
-        self.backend.broadcast(message='ping', channel='123', sender=socket)
+        self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
         result = self.backend.get_subscribers(channel='123')
         self.assertEqual(list(result), [socket])
 

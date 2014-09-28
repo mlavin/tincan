@@ -60,7 +60,7 @@ class Backend(BaseBackend):
     def broadcast(self, message, channel, sender):
         peers = self.get_subscribers(channel)
         for peer in peers:
-            if peer != sender:
+            if peer.uuid != sender:
                 try:
                     peer.write_message(message)
                 except WebSocketClosedError:
