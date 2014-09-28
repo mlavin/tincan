@@ -50,7 +50,7 @@ def shutdown(server, application, graceful=True):
 
 def main():
     parse_command_line()
-    application = ShoestringApplication(debug=options.debug, backend=options.backend)
+    application = ShoestringApplication(debug=options.debug, backend=options.backend, allowed_hosts=allowed_hosts)
     server = HTTPServer(application)
     server.listen(options.port)
     signal.signal(signal.SIGINT, lambda sig, frame: shutdown(server, application, graceful=True))

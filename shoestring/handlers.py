@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 import jwt
 
 from tornado.httputil import url_concat
-from tornado.options import options
 from tornado.web import RequestHandler, HTTPError
 from tornado.websocket import WebSocketHandler
 
@@ -35,8 +34,8 @@ class SocketHandler(BackendMixin, WebSocketHandler):
     def check_origin(self, origin):
         allowed = super().check_origin(origin)
         parsed = urlparse(origin.lower())
-        matched = any(parsed.netloc == host for host in options.allowed_hosts)
-        return options.debug or allowed or matched
+        matched = any(parsed.netloc == host for host in self.settings.get('allowed_hosts', []))
+        return self.settings.get('debug', False) or allowed or matched
 
     def _get_channel(self):
         token = self.get_argument('token', None)
@@ -51,7 +50,7 @@ class SocketHandler(BackendMixin, WebSocketHandler):
             members = self.backend.get_room(info['room'])
         except KeyError:
             raise TokenError(code=4300, reason='Invalid channel.')
-        else:  
+        else:
             if channel is None or channel == info['room']:
                 channel = info['room']
             elif channel == info['uuid']:
