@@ -12,7 +12,7 @@ from tornado.httpclient import HTTPRequest, HTTPError
 from tornado.testing import AsyncHTTPTestCase, LogTrapTestCase, gen_test
 from tornado.websocket import websocket_connect
 
-from shoestring.app import ShoestringApplication
+from ..app import ShoestringApplication
 
 
 class BaseAppTestCase(AsyncHTTPTestCase, LogTrapTestCase):
