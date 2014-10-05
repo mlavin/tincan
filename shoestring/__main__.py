@@ -1,10 +1,9 @@
 import logging
 import signal
-import sys
 import time
 
 from tornado.httpserver import HTTPServer
-from tornado.ioloop import IOLoop, PeriodicCallback
+from tornado.ioloop import IOLoop
 from tornado.options import define, parse_command_line, options
 
 from .app import ShoestringApplication
@@ -17,8 +16,8 @@ define('backend', default='shoestring.backends.memory', help='Backend for storin
 define('graceful', default=10, type=int, help='Max number of seconds to wait for a graceful shutdown.')
 
 
-def shutdown(server, application, graceful=True):
-    ioloop = IOLoop.instance()
+def shutdown(server, application, graceful=True, ioloop=None):
+    ioloop = ioloop or IOLoop.current()
     if getattr(server, '_stopping', False):
         graceful = False
     else:
@@ -26,12 +25,11 @@ def shutdown(server, application, graceful=True):
         logging.info('Stopping server...')
         server.stop()
         logging.info('Stopping application...')
-        application.shutdown()
+        application.shutdown(graceful=graceful)
 
     def finalize():
         ioloop.stop()
         logging.info('Stopped.')
-        sys.exit(0)
 
     deadline = time.time() + options.graceful
 
@@ -48,9 +46,11 @@ def shutdown(server, application, graceful=True):
         finalize()
 
 
-def main():
+def main(ioloop=None):
+    ioloop = ioloop or IOLoop.current()
     parse_command_line()
-    application = ShoestringApplication(debug=options.debug, backend=options.backend, allowed_hosts=allowed_hosts)
+    application = ShoestringApplication(
+        debug=options.debug, backend=options.backend, allowed_hosts=options.allowed_hosts)
     server = HTTPServer(application)
     server.listen(options.port)
     signal.signal(signal.SIGINT, lambda sig, frame: shutdown(server, application, graceful=True))
@@ -58,7 +58,8 @@ def main():
     signal.signal(signal.SIGALRM, lambda sig, frame: shutdown(server, application, graceful=True))
     signal.signal(signal.SIGQUIT, lambda sig, frame: shutdown(server, application, graceful=False))
     logging.info('Starting server on localhost:%d', options.port)
-    IOLoop.instance().start()
+    if not ioloop._running:
+        ioloop.start()
 
 
 if __name__ == "__main__":  # pragma: no cover
