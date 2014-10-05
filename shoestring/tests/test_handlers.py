@@ -8,7 +8,6 @@ import jwt
 from tornado import gen
 from tornado.concurrent import Future
 from tornado.httpclient import HTTPRequest, HTTPError
-# from tornado.options import options
 from tornado.testing import AsyncHTTPTestCase, LogTrapTestCase, gen_test
 from tornado.websocket import websocket_connect
 

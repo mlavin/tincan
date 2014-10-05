@@ -11,7 +11,7 @@ try:
     from redis import Redis
     from tornadoredis import Client
     from tornadoredis.pubsub import BaseSubscriber
-except ImportError as e:
+except ImportError as e:  # pragma: no cover
     msg = 'The redis backend requires installing redis-py and tornado-redis.'
     raise ImportError(msg) from e
 
@@ -36,7 +36,7 @@ class RedisSubscriber(BaseSubscriber):
                     if sender != subscriber.uuid:
                         try:
                             subscriber.write_message(message)
-                        except tornado.websocket.WebSocketClosedError:
+                        except WebSocketClosedError:
                             # Remove dead peer
                             self.unsubscribe(msg.channel, subscriber)
         elif msg.kind == 'disconnect':
@@ -93,6 +93,8 @@ class Backend(BaseBackend):
         self.subscriber.subscribe(channel, subscriber)
         key = self._room_key(channel)
         if self.publisher.exists(key):
+            if self.publisher.hget(key, subscriber.uuid):
+                raise ValueError('Already subscribed.')
             self.publisher.hset(key, subscriber.uuid, 'subscribed')
             # Remove any expiry on the room
             self.publisher.persist(key)

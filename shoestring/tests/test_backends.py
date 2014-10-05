@@ -1,11 +1,14 @@
-import unittest
+import time
 import uuid
 
 from unittest.mock import Mock
 
+from tornado import gen
 from tornado.websocket import WebSocketClosedError
+from tornado.testing import AsyncTestCase, gen_test
 
 from ..backends.memory import Backend as MemoryBackend
+from ..backends.redis import Backend as RedisBackend
 
 
 class BackendAPIMixin(object):
@@ -19,6 +22,10 @@ class BackendAPIMixin(object):
 
     def get_socket(self):
         return Mock(uuid=uuid.uuid4().hex)
+
+    @gen.coroutine
+    def pause(self, seconds=0.1):
+        yield gen.Task(self.io_loop.add_timeout, time.time() + seconds)
 
     def test_create_room(self):
         """Create a new room and return the name."""
@@ -79,10 +86,10 @@ class BackendAPIMixin(object):
         socket = self.get_socket()
         self.backend.add_subscriber('123', socket)
         result = self.backend.get_subscribers(channel='123')
-        self.assertEqual(list(result), [socket, ])
+        self.assertEqual(set(result), set([socket, ]))
         self.backend.remove_subscriber('123', socket)
         result = self.backend.get_subscribers(channel='123')
-        self.assertEqual(list(result), [])
+        self.assertEqual(set(result), set([]))
 
     def test_remove_room_subscriber(self):
         """Remove websocket subscriber to a room channel and update status."""
@@ -95,6 +102,7 @@ class BackendAPIMixin(object):
         result = self.backend.get_room(room)
         self.assertEqual(result, {socket.uuid: False})
 
+    @gen_test
     def test_broadcast(self):
         """Broadcast message to other channel subscribers."""
         socket = self.get_socket()
@@ -102,9 +110,11 @@ class BackendAPIMixin(object):
         self.backend.add_subscriber('123', socket)
         self.backend.add_subscriber('123', peer)
         self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
+        yield self.pause()
         peer.write_message.assert_called_with('ping')
         self.assertFalse(socket.write_message.called)
 
+    @gen_test
     def test_broadcast_alone(self):
         """Broadcast message into single occupied channel."""
         socket = self.get_socket()
@@ -112,17 +122,21 @@ class BackendAPIMixin(object):
         self.backend.add_subscriber('123', socket)
         self.backend.add_subscriber('456', peer)
         self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
+        yield self.pause()
         self.assertFalse(peer.write_message.called)
         self.assertFalse(socket.write_message.called)
 
+    @gen_test
     def test_broadcast_empty(self):
         """Broadcast message into empty channel."""
         socket = self.get_socket()
         peer = self.get_socket()
         self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
+        yield self.pause()
         self.assertFalse(peer.write_message.called)
         self.assertFalse(socket.write_message.called)
 
+    @gen_test
     def test_broadcast_dead_peer(self):
         """Remove dead peers detected on broadcast."""
         socket = self.get_socket()
@@ -131,10 +145,11 @@ class BackendAPIMixin(object):
         self.backend.add_subscriber('123', socket)
         self.backend.add_subscriber('123', peer)
         result = self.backend.get_subscribers(channel='123')
-        self.assertEqual(list(result), [socket, peer])
+        self.assertEqual(set(result), set([socket, peer]))
         self.backend.broadcast(message='ping', channel='123', sender=socket.uuid)
+        yield self.pause()
         result = self.backend.get_subscribers(channel='123')
-        self.assertEqual(list(result), [socket])
+        self.assertEqual(set(result), set([socket]))
 
     def test_graceful_shutdown(self):
         """Notify all subscribers when the server is shutting down gracefully."""
@@ -157,6 +172,11 @@ class BackendAPIMixin(object):
         peer.close.assert_called_with(code=4100, reason='Server shutdown.')
 
 
-class MemoryBackendTestCase(BackendAPIMixin, unittest.TestCase):
+class MemoryBackendTestCase(BackendAPIMixin, AsyncTestCase):
 
     backend_class = MemoryBackend
+
+
+class RedisBackendTestCase(BackendAPIMixin, AsyncTestCase):
+
+    backend_class = RedisBackend
