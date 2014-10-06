@@ -1,7 +1,10 @@
 import datetime
 import json
 import logging
+import os
 import signal
+
+from urllib.parse import urlparse
 
 from tornado.websocket import WebSocketClosedError
 
@@ -50,11 +53,35 @@ class Backend(BaseBackend):
     """Redis channel backend."""
 
     KEY_FORMAT = 'shoestring-room:{}'
+    ENV_KEY = 'SHOESTRING_REDIS_URL'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.subscriber = RedisSubscriber(Client())
-        self.publisher = Redis()
+        info = self.parse_redis_parameters()
+        db_number = info.pop('db', 0)
+        self.publisher = Redis(db=db_number, **info)
+        self.subscriber = RedisSubscriber(Client(selected_db=db_number, **info))
+
+    def parse_redis_parameters(self):
+        """Parse Redis host, port, db, password info from the OS environment."""
+        if self.ENV_KEY in os.environ:
+            parsed = urlparse(os.environ[self.ENV_KEY])
+            if parsed.hostname is None:
+                raise RuntimeError('Invalid Redis URL: {}'.format(os.environ[self.ENV_KEY]))
+            db = 0
+            if parsed.path:
+                try:
+                    db = int(parsed.path.lstrip('/'))
+                except:
+                    raise RuntimeError('Invalid Redis DB: {}'.format(parsed.path.lstrip('/')))
+            return {
+                'host': parsed.hostname,
+                'port': parsed.port,
+                'password': parsed.password,
+                'db': db,
+            }
+        else:
+            return {}
 
     def _room_key(self, name):
         return self.KEY_FORMAT.format(name)
