@@ -1,0 +1,6 @@
+PyJWT==0.2.1
+certifi==14.05.14
+hiredis==0.1.4
+redis==2.10.3
+tornado==4.0.1
+tornado-redis==2.4.18
