@@ -1,7 +1,7 @@
 image: python:3.3
 
 script:
-  - sudo start redis
+  - start redis
   - pip install -r requirements.txt
   - python -m unittest discover
 
