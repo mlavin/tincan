@@ -1,7 +1,7 @@
 image: python:3.3
 
 script:
-  - start redis
+  - service redis start
   - pip install -r requirements.txt
   - python -m unittest discover
 
