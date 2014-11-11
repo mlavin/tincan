@@ -1,7 +1,7 @@
 image: python:3.3
 
 script:
-  - service redis-server start
+  - apt-get install socat
   - pip install -r requirements.txt
   - python -m unittest discover
 
