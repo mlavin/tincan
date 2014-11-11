@@ -1,7 +1,7 @@
 image: python:3.3
 
 script:
-  - apt-get install -y socat
+  - sleep 10
   - pip install -r requirements.txt
   - python -m unittest discover
 
