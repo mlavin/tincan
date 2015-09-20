@@ -1,0 +1,81 @@
+@import url(http://fonts.googleapis.com/css?family=Lato:300,400,700,900);
+
+/* Generic
+==================== */
+body {
+    -moz-box-sizing: border-box;
+         box-sizing: border-box;
+    font-family: 'Lato', Helvetica, sans-serif;
+}
+
+a { text-decoration: none; }
+
+button, a.button {
+    font-size: 13px;
+    padding: 5px 8px;
+    border: 2px solid #222; 
+    background-color: #FFF;
+    color: #222;
+    transition: background 200ms ease-out;
+}
+
+button:hover, a.button:hover {
+    background-color: #222;
+    color: #FFF;
+}
+
+.splash {
+    width: 80%;
+    height: 50%;
+    margin: auto;
+    position: absolute;
+    top: 100px; left: 0; bottom: 0; right: 0;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.splash a.button {
+    padding: 0.5em 2em;
+    border-radius: 5px;
+    font-size: 120%;
+}
+
+.splash-head {
+    font-size: 20px;
+    font-weight: bold;
+    border: 3px solid #CCC;
+    padding: 1em 1.6em;
+    font-weight: 100;
+    border-radius: 5px;
+    line-height: 1em;
+}
+
+.splash-subhead {
+    letter-spacing: 0.05em;
+    opacity: 0.8;
+    padding: 0.5em 0.8em;
+}
+
+#room {
+    display: none;
+    width: 80%;
+    height: 50%;
+    margin: auto;
+    text-align: center;
+}
+
+#progress progress {
+    width: 100%;
+}
+
+#files .upload {
+    padding: 2em;
+    margin: 1em;
+    border: 3px dashed #CCC;
+}
+
+#files .upload.hover {
+    border: 3px solid #CCC;
+    background-color: #222;
+    color: #FFF;
+}
